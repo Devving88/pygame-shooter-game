@@ -28,30 +28,31 @@ font = pygame.font.SysFont("Arial", 28, bold=True)
 title_font = pygame.font.SysFont("Arial", 50, bold=True)
 game_over_font = pygame.font.SysFont("Arial", 60, bold=True)
 
-# ตัวแปรผู้เล่น (Player)
+# ตัวแปรผู้เล่น (Player) - เพิ่ม HP เริ่มต้นเป็น 5 ให้เล่นง่ายขึ้น
 player_width = 60
 player_height = 20
 player_x = (SCREEN_WIDTH - player_width) // 2
 player_y = SCREEN_HEIGHT - 60
 player_speed = 6
-player_hp = 3
+player_hp = 5
 player_score = 0
 
-# ระบบกระสุน (Bullets)
+# ระบบกระสุน (Bullets & Auto-fire cooldown)
 bullets = []
 bullet_width = 6
 bullet_height = 15
 bullet_speed = 10
+shoot_cooldown = 0
+shoot_cooldown_max = 12  # ยิงต่อเนื่องทุกๆ 12 เฟรมเมื่อกดค้าง
 
-# ระบบศัตรู (Enemies)
+# ระบบศัตรู (Enemies) - ปรับให้เกิดช้าลงและเคลื่อนที่ช้าลงเพื่อให้เล่นง่าย
 enemies = []
 enemy_width = 40
 enemy_height = 40
 enemy_spawn_timer = 0
-enemy_spawn_interval = 40  # จะถูกปรับตามด่าน
+enemy_spawn_interval = 60  # เริ่มต้นที่ 60 เฟรม (ช้าลง)
 
 # ระบบด่านและสถานะเกม (Game States)
-# Game States: "START_SCREEN", "PLAYING", "STAGE_CLEARED", "GAME_OVER", "VICTORY"
 game_state = "START_SCREEN"
 current_stage = 1
 max_stage = 3
@@ -61,13 +62,13 @@ enemies_target_per_stage = 10
 def reset_game():
     global player_x, player_hp, player_score, bullets, enemies, game_state, current_stage, enemies_killed_in_stage, enemy_spawn_interval
     player_x = (SCREEN_WIDTH - player_width) // 2
-    player_hp = 3
+    player_hp = 5
     player_score = 0
     current_stage = 1
     enemies_killed_in_stage = 0
     bullets.clear()
     enemies.clear()
-    enemy_spawn_interval = 40
+    enemy_spawn_interval = 60
     game_state = "PLAYING"
 
 def start_next_stage():
@@ -77,11 +78,11 @@ def start_next_stage():
     bullets.clear()
     enemies.clear()
     
-    # เพิ่มความยาก (อัตราการเกิดและความเร็วศัตรู) ให้สูงขึ้นในด่านที่สูงขึ้น
+    # ปรับความยากขึ้นเล็กน้อยตามด่าน แต่ยังคงความง่ายกว่าเดิม
     if current_stage == 2:
-        enemy_spawn_interval = 30  # ศัตรูเกิดเร็วขึ้น
+        enemy_spawn_interval = 50
     elif current_stage == 3:
-        enemy_spawn_interval = 20  # ศัตรูเกิดเร็วขึ้นมาก
+        enemy_spawn_interval = 40
         
     game_state = "PLAYING"
 
@@ -105,16 +106,12 @@ while running:
                         start_next_stage()
                     else:
                         game_state = "VICTORY"
-            elif game_state == "PLAYING":
-                if event.key == pygame.K_SPACE:
-                    # ยิงกระสุน
-                    bullet_x = player_x + (player_width // 2) - (bullet_width // 2)
-                    bullet_y = player_y
-                    bullets.append([bullet_x, bullet_y])
 
-    # ตรวจสอบการกดปุ่มคีย์บอร์ดค้างไว้สำหรับการเคลื่อนที่ (เฉพาะตอน PLAYING)
+    # ตรวจสอบการกดปุ่มคีย์บอร์ดค้างไว้สำหรับการเคลื่อนที่และการยิงต่อเนื่อง
     if game_state == "PLAYING":
         keys = pygame.key.get_pressed()
+        
+        # เคลื่อนที่
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             player_x -= player_speed
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
@@ -126,6 +123,17 @@ while running:
         elif player_x > SCREEN_WIDTH - player_width:
             player_x = SCREEN_WIDTH - player_width
 
+        # ยิงกระสุนอัตโนมัติเมื่อกด SPACE ค้างไว้
+        if keys[pygame.K_SPACE]:
+            if shoot_cooldown <= 0:
+                bullet_x = player_x + (player_width // 2) - (bullet_width // 2)
+                bullet_y = player_y
+                bullets.append([bullet_x, bullet_y])
+                shoot_cooldown = shoot_cooldown_max
+        
+        if shoot_cooldown > 0:
+            shoot_cooldown -= 1
+
         # 2. อัปเดตสถานะเกม (Update Game State)
         
         # สุ่มเกิดศัตรู
@@ -134,9 +142,9 @@ while running:
             enemy_spawn_timer = 0
             ex = random.randint(0, SCREEN_WIDTH - enemy_width)
             ey = -enemy_height
-            # ความเร็วศัตรูเพิ่มขึ้นตามด่านอย่างชัดเจน (Stage 1: 3-5, Stage 2: 5-7, Stage 3: 7-10)
-            min_speed = 3 + (current_stage - 1) * 2
-            max_speed = 5 + (current_stage - 1) * 2
+            # ความเร็วศัตรูช้าลงเพื่อให้เล่นง่าย (Stage 1: 2-3, Stage 2: 3-4, Stage 3: 4-5)
+            min_speed = 2 + (current_stage - 1)
+            max_speed = 3 + (current_stage - 1)
             espeed = random.randint(min_speed, max_speed)
             enemies.append([ex, ey, espeed])
 
@@ -151,7 +159,7 @@ while running:
         for enemy in enemies[:]:
             enemy[1] += enemy[2]
             
-            # ถ้าศัตรูตกหลุดขอบล่างจอ
+            # ถ้าศัตรูตกหลุดขอบล่างจอ (ลด HP 1)
             if enemy[1] > SCREEN_HEIGHT:
                 enemies.remove(enemy)
                 player_hp -= 1
@@ -201,7 +209,7 @@ while running:
         # หน้าจอเมนูหลัก (Start Screen)
         title_surface = title_font.render("SPACE SHOOTER GAME", True, CYAN)
         start_prompt = font.render("Press 'SPACE' or 'ENTER' to Start", True, YELLOW)
-        controls_info = font.render("Move: A/D or Arrow Keys | Shoot: SPACE", True, WHITE)
+        controls_info = font.render("Move: A/D or Arrows | Hold SPACE to Shoot", True, WHITE)
 
         screen.blit(title_surface, (SCREEN_WIDTH // 2 - title_surface.get_width() // 2, SCREEN_HEIGHT // 2 - 100))
         screen.blit(start_prompt, (SCREEN_WIDTH // 2 - start_prompt.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
