@@ -20,7 +20,7 @@ CYAN = (0, 200, 200)
 # เริ่มต้นใช้งาน Pygame
 pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Pygame Step 3: Stage Progression & Game States")
+pygame.display.set_caption("Pygame: Stage Progression & Game States")
 clock = pygame.time.Clock()
 
 # ฟอนต์สำหรับแสดงผล
@@ -50,9 +50,9 @@ enemy_height = 40
 enemy_spawn_timer = 0
 enemy_spawn_interval = 40  # จะถูกปรับตามด่าน
 
-# ระบบด่านและสถานะเกม (Stage Progression & Game States)
-# Game States: "PLAYING", "STAGE_CLEARED", "GAME_OVER", "VICTORY"
-game_state = "PLAYING"
+# ระบบด่านและสถานะเกม (Game States)
+# Game States: "START_SCREEN", "PLAYING", "STAGE_CLEARED", "GAME_OVER", "VICTORY"
+game_state = "START_SCREEN"
 current_stage = 1
 max_stage = 3
 enemies_killed_in_stage = 0
@@ -77,11 +77,11 @@ def start_next_stage():
     bullets.clear()
     enemies.clear()
     
-    # ปรับความยากตามด่าน (เช่น ศัตรูเกิดเร็วขึ้น)
+    # เพิ่มความยาก (อัตราการเกิดและความเร็วศัตรู) ให้สูงขึ้นในด่านที่สูงขึ้น
     if current_stage == 2:
-        enemy_spawn_interval = 32
+        enemy_spawn_interval = 30  # ศัตรูเกิดเร็วขึ้น
     elif current_stage == 3:
-        enemy_spawn_interval = 25
+        enemy_spawn_interval = 20  # ศัตรูเกิดเร็วขึ้นมาก
         
     game_state = "PLAYING"
 
@@ -93,7 +93,10 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if game_state == "GAME_OVER" or game_state == "VICTORY":
+            if game_state == "START_SCREEN":
+                if event.key == pygame.K_SPACE or event.key == pygame.K_RETURN:
+                    reset_game()
+            elif game_state == "GAME_OVER" or game_state == "VICTORY":
                 if event.key == pygame.K_r:
                     reset_game()
             elif game_state == "STAGE_CLEARED":
@@ -131,9 +134,9 @@ while running:
             enemy_spawn_timer = 0
             ex = random.randint(0, SCREEN_WIDTH - enemy_width)
             ey = -enemy_height
-            # ความเร็วศัตรูเพิ่มขึ้นตามด่าน
-            min_speed = 3 + (current_stage - 1)
-            max_speed = 6 + (current_stage - 1)
+            # ความเร็วศัตรูเพิ่มขึ้นตามด่านอย่างชัดเจน (Stage 1: 3-5, Stage 2: 5-7, Stage 3: 7-10)
+            min_speed = 3 + (current_stage - 1) * 2
+            max_speed = 5 + (current_stage - 1) * 2
             espeed = random.randint(min_speed, max_speed)
             enemies.append([ex, ey, espeed])
 
@@ -194,7 +197,17 @@ while running:
     # 3. วาดภาพกราฟิก (Render / Draw)
     screen.fill(BLACK)
 
-    if game_state == "PLAYING":
+    if game_state == "START_SCREEN":
+        # หน้าจอเมนูหลัก (Start Screen)
+        title_surface = title_font.render("SPACE SHOOTER GAME", True, CYAN)
+        start_prompt = font.render("Press 'SPACE' or 'ENTER' to Start", True, YELLOW)
+        controls_info = font.render("Move: A/D or Arrow Keys | Shoot: SPACE", True, WHITE)
+
+        screen.blit(title_surface, (SCREEN_WIDTH // 2 - title_surface.get_width() // 2, SCREEN_HEIGHT // 2 - 100))
+        screen.blit(start_prompt, (SCREEN_WIDTH // 2 - start_prompt.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
+        screen.blit(controls_info, (SCREEN_WIDTH // 2 - controls_info.get_width() // 2, SCREEN_HEIGHT // 2 + 50))
+
+    elif game_state == "PLAYING":
         # วาดผู้เล่น
         pygame.draw.rect(screen, BLUE, (player_x, player_y, player_width, player_height))
 
@@ -202,7 +215,7 @@ while running:
         for bullet in bullets:
             pygame.draw.rect(screen, YELLOW, (bullet[0], bullet[1], bullet_width, bullet_height))
 
-        # วาดศัตรู (เปลี่ยนสีตามด่านเพื่อให้เห็นความแตกต่าง)
+        # วาดศัตรู (เปลี่ยนสีตามด่าน)
         enemy_color = RED if current_stage == 1 else (PURPLE if current_stage == 2 else CYAN)
         for enemy in enemies:
             pygame.draw.rect(screen, enemy_color, (enemy[0], enemy[1], enemy_width, enemy_height))
@@ -221,7 +234,7 @@ while running:
     elif game_state == "STAGE_CLEARED":
         # หน้าจอ Stage Cleared
         cleared_title = title_font.render(f"STAGE {current_stage} CLEARED!", True, GREEN)
-        next_prompt = font.render("Press 'SPACE' or 'ENTER' to Next Stage", True, YELLOW)
+        next_prompt = font.render("Press 'SPACE' or 'ENTER' for Next Stage", True, YELLOW)
         score_info = font.render(f"Current Score: {player_score}", True, WHITE)
 
         screen.blit(cleared_title, (SCREEN_WIDTH // 2 - cleared_title.get_width() // 2, SCREEN_HEIGHT // 2 - 80))
@@ -229,7 +242,7 @@ while running:
         screen.blit(next_prompt, (SCREEN_WIDTH // 2 - next_prompt.get_width() // 2, SCREEN_HEIGHT // 2 + 50))
 
     elif game_state == "GAME_OVER":
-        # หน้าจอ Game Over
+        # หน้าจอ Game Over (เมื่อ HP หมด) มีปุ่มให้กดเล่นใหม่ (Restart)
         game_over_surface = game_over_font.render("GAME OVER", True, RED)
         final_score_surface = font.render(f"Final Score: {player_score}", True, WHITE)
         restart_surface = font.render("Press 'R' to Restart", True, YELLOW)
